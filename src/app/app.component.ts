@@ -37,6 +37,12 @@ export class AppComponent implements OnInit {
   private gridApi!: GridApi;
   
   title = 'Fixed Income Positions Grid';
+  
+  // Range selection optimization properties
+  private rangeSelectionTimer: any;
+  private maxRangeSelectionRows = 1000; // Limit range selection to 1000 rows
+  private maxRangeSelectionCols = 50; // Limit range selection to 50 columns
+  private isLargeRangeSelection = false;
 
   constructor() {
     // Set license key for ag-grid-enterprise (trial version)
@@ -55,6 +61,14 @@ export class AppComponent implements OnInit {
     enableRowGroup: true,
     enablePivot: true,
     enableValue: true,
+    // Performance optimizations for large grids
+    lockVisible: true, // Prevent columns from being hidden/shown dynamically
+    suppressCellFlash: true, // Disable cell flashing for better performance
+    comparator: (valueA: any, valueB: any) => {
+      // Simple comparator for better performance
+      if (valueA === valueB) return 0;
+      return valueA > valueB ? 1 : -1;
+    }
   };
   
   public gridOptions: GridOptions = {
@@ -74,6 +88,45 @@ export class AppComponent implements OnInit {
     infiniteInitialRowCount: 1000,
     rowSelection: 'multiple',
     enableRangeSelection: true,
+    // Pagination option (uncomment to enable pagination instead of virtual scrolling)
+    // pagination: true,
+    // paginationPageSize: 100,
+    // paginationPageSizeSelector: [50, 100, 200, 500],
+    // Range selection performance optimizations
+    suppressMultiRangeSelection: true, // Allow only single range selection
+    suppressClearOnFillReduction: true, // Prevent clearing on fill reduction
+    enableRangeHandle: false, // Disable range handle for better performance
+    enableFillHandle: false, // Disable fill handle for better performance
+    // Row grouping configuration
+    rowGroupPanelShow: 'always',  // Enable row group panel
+    groupDefaultExpanded: -1,      // Auto expand all groups (-1 means all levels)
+    groupDisplayType: 'singleColumn', // Display grouped columns as single column
+    autoGroupColumnDef: {
+      headerName: 'Group',
+      minWidth: 300,
+      cellRendererParams: {
+        suppressCount: false,  // Show count in group
+        innerRenderer: (params: any) => {
+          // Custom group renderer
+          if (params.value) {
+            return params.value;
+          }
+          return null;
+        }
+      },
+      // Add aggregations to group column
+      valueGetter: (params: any) => {
+        if (params.node.group) {
+          const field = params.node.field;
+          return `${field}: ${params.node.key}`;
+        }
+        return null;
+      }
+    },
+    // Performance optimizations
+    debounceVerticalScrollbar: true, // Debounce vertical scrolling
+    suppressScrollOnNewData: true, // Don't scroll on new data
+    suppressAnimationFrame: false, // Use animation frames for better performance
     // Enable status bar
     statusBar: {
       statusPanels: [
@@ -112,7 +165,10 @@ export class AppComponent implements OnInit {
         }
       ],
       defaultToolPanel: 'columns'
-    }
+    },
+    // Range selection event handlers
+    onRangeSelectionChanged: this.onRangeSelectionChanged.bind(this),
+    onCellKeyDown: this.onCellKeyDown.bind(this)
   };
 
   ngOnInit(): void {
@@ -131,11 +187,29 @@ export class AppComponent implements OnInit {
       { field: 'isin', headerName: 'ISIN', width: 140 },
       { field: 'sedol', headerName: 'SEDOL', width: 100 },
       { field: 'securityName', headerName: 'Security Name', width: 250 },
-      { field: 'issuer', headerName: 'Issuer', width: 200 },
-      { field: 'sector', headerName: 'Sector', width: 150 },
+      { 
+        field: 'issuer', 
+        headerName: 'Issuer', 
+        width: 200,
+        rowGroup: true,  // Enable row grouping for issuer
+        hide: true       // Hide column when grouped
+      },
+      { 
+        field: 'sector', 
+        headerName: 'Sector', 
+        width: 150,
+        rowGroup: true,  // Enable row grouping for sector
+        hide: true       // Hide column when grouped
+      },
       { field: 'subsector', headerName: 'Subsector', width: 150 },
       { field: 'country', headerName: 'Country', width: 120 },
-      { field: 'region', headerName: 'Region', width: 120 },
+      { 
+        field: 'region', 
+        headerName: 'Region', 
+        width: 120,
+        rowGroup: true,  // Enable row grouping for region
+        hide: true       // Hide column when grouped
+      },
       { field: 'currency', headerName: 'Currency', width: 100 },
       { field: 'rating', headerName: 'Rating', width: 100 },
       { field: 'maturityDate', headerName: 'Maturity Date', width: 120 },
@@ -161,19 +235,22 @@ export class AppComponent implements OnInit {
         field: 'marketValue', 
         headerName: 'Market Value', 
         width: 150,
-        valueFormatter: params => params.value ? '$' + params.value.toLocaleString() : ''
+        valueFormatter: params => params.value ? '$' + params.value.toLocaleString() : '',
+        aggFunc: 'sum'  // Add aggregation for market value
       },
       { 
         field: 'positionSize', 
         headerName: 'Position Size', 
         width: 130,
-        valueFormatter: params => params.value ? params.value.toLocaleString() : ''
+        valueFormatter: params => params.value ? params.value.toLocaleString() : '',
+        aggFunc: 'sum'  // Add aggregation for position size
       },
       { 
         field: 'duration', 
         headerName: 'Duration', 
         width: 100,
-        valueFormatter: params => params.value ? params.value.toFixed(2) : ''
+        valueFormatter: params => params.value ? params.value.toFixed(2) : '',
+        aggFunc: 'avg'  // Add average aggregation for duration
       }
     ];
 
@@ -334,12 +411,94 @@ export class AppComponent implements OnInit {
   onGridReady(params: GridReadyEvent): void {
     this.gridApi = params.api;
     
+    // The row groups are already set in the column definitions with rowGroup: true
+    // They will be automatically applied for issuer, region, and sector columns
+    
     // Optional: Auto-size columns to fit (might be slow with 300 columns)
     // params.api.sizeColumnsToFit();
     
     console.log('Grid Ready: ', {
       totalRows: this.rowData.length,
-      totalColumns: this.columnDefs.length
+      totalColumns: this.columnDefs.length,
+      rowGroups: ['issuer', 'region', 'sector']
     });
+  }
+  
+  // Range selection optimization handlers
+  onRangeSelectionChanged(event: any): void {
+    // Clear any existing timer
+    if (this.rangeSelectionTimer) {
+      clearTimeout(this.rangeSelectionTimer);
+    }
+    
+    // Debounce range selection processing
+    this.rangeSelectionTimer = setTimeout(() => {
+      const ranges = this.gridApi.getCellRanges();
+      
+      if (ranges && ranges.length > 0) {
+        const range = ranges[0]; // Since we're using suppressMultiRangeSelection
+        
+        // Calculate range size
+        const startRow = range.startRow?.rowIndex ?? 0;
+        const endRow = range.endRow?.rowIndex ?? 0;
+        const rowCount = Math.abs(endRow - startRow) + 1;
+        
+        const columns = range.columns || [];
+        const colCount = columns.length;
+        
+        // Check if selection is too large
+        if (rowCount > this.maxRangeSelectionRows || colCount > this.maxRangeSelectionCols) {
+          this.isLargeRangeSelection = true;
+          
+          // Limit the selection
+          const limitedEndRow = startRow + (endRow > startRow ? this.maxRangeSelectionRows - 1 : -(this.maxRangeSelectionRows - 1));
+          const limitedColumns = columns.slice(0, this.maxRangeSelectionCols);
+          
+          // Clear current ranges and set limited range
+          this.gridApi.clearRangeSelection();
+          
+          // Create limited range
+          this.gridApi.addCellRange({
+            rowStartIndex: startRow,
+            rowEndIndex: limitedEndRow,
+            columns: limitedColumns
+          });
+          
+          console.warn(`Range selection limited to ${this.maxRangeSelectionRows} rows and ${this.maxRangeSelectionCols} columns for performance`);
+        } else {
+          this.isLargeRangeSelection = false;
+        }
+      }
+    }, 100); // 100ms debounce
+  }
+  
+  onCellKeyDown(event: any): void {
+    // Detect if user is holding Shift + Arrow keys
+    if (event.event.shiftKey && (event.event.key === 'ArrowDown' || event.event.key === 'ArrowUp' || 
+        event.event.key === 'ArrowLeft' || event.event.key === 'ArrowRight')) {
+      
+      // If already in large selection mode, prevent default to avoid performance issues
+      if (this.isLargeRangeSelection) {
+        event.event.preventDefault();
+        event.event.stopPropagation();
+        return;
+      }
+      
+      // Check current selection size
+      const ranges = this.gridApi.getCellRanges();
+      if (ranges && ranges.length > 0) {
+        const range = ranges[0];
+        const startRow = range.startRow?.rowIndex ?? 0;
+        const endRow = range.endRow?.rowIndex ?? 0;
+        const rowCount = Math.abs(endRow - startRow) + 1;
+        
+        // Prevent selection if approaching limit
+        if (rowCount >= this.maxRangeSelectionRows - 100) {
+          event.event.preventDefault();
+          event.event.stopPropagation();
+          console.warn('Approaching maximum range selection size');
+        }
+      }
+    }
   }
 }
