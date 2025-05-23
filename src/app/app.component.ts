@@ -17,7 +17,9 @@ export class AppComponent implements OnInit {
   public rowData: any[] = [];
   public columnDefs = fixedIncomeColumnDefs.map(col => ({
     ...col,
-    pinned: undefined // Remove any pinned property
+    pinned: undefined, // Remove any pinned property
+    enableRowGroup: true, // Enable row grouping for all columns
+    aggFunc: 'sum' // Default aggregation function
   }));
   
   public defaultColDef: ColDef = {
@@ -25,7 +27,9 @@ export class AppComponent implements OnInit {
     filter: true,
     resizable: true,
     minWidth: 100,
-    flex: 1
+    flex: 1,
+    enableRowGroup: true, // Enable row grouping by default
+   
   };
   
   public gridOptions: GridOptions = {
@@ -33,8 +37,14 @@ export class AppComponent implements OnInit {
     columnDefs: this.columnDefs,
     rowData: [],
     rowSelection: 'multiple' as const,
+    // Disable pagination
+    pagination: false,
     // Enable row group panel
     rowGroupPanelShow: 'always',
+    // Enable auto-expansion of grouped rows
+    groupDefaultExpanded: -1, // -1 means expand all groups
+    // Set initial grouping
+    groupDisplayType: 'singleColumn',
     // Enable status bar
     statusBar: {
       statusPanels: [
@@ -79,6 +89,9 @@ export class AppComponent implements OnInit {
   onGridReady(params: GridReadyEvent): void {
     this.gridApi = params.api;
     
+    // Set initial grouping
+    this.gridApi.setRowGroupColumns([ 'issuerName','issuerSector','issuerType']);
+    
     console.log('Grid Ready: ', {
       totalRows: this.rowData.length,
       totalColumns: this.columnDefs.length
@@ -86,11 +99,6 @@ export class AppComponent implements OnInit {
   }
 
   toggleAggregationPanel(): void {
-    this.showAggregationPanel = !this.showAggregationPanel;
-    if (this.gridApi) {
-      const displayType = this.showAggregationPanel ? 'groupRows' : 'group';
-      this.gridApi.setGridOption('groupDisplayType', displayType as any);
-      this.gridApi.refreshCells();
-    }
+  
   }
 }
