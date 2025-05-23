@@ -1,19 +1,22 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { AgGridAngular } from 'ag-grid-angular';
 import { GridOptions, GridReadyEvent, GridApi, ColDef } from 'ag-grid-community';
 import { LicenseManager } from 'ag-grid-enterprise';
 import { generateFixedIncomePositions, fixedIncomeColumnDefs, defaultGridOptions, gridStyles } from './position_data_generator';
+import { GridWrapper, EnhancedNavigationConfig } from './grid_wrapper_v32';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   @ViewChild(AgGridAngular) agGrid!: AgGridAngular;
   private gridApi!: GridApi;
+  private navigationCleanup?: () => void;
   title = 'Fixed Income Positions Grid';
   showAggregationPanel = true;
+  public enhancedNavigationEnabled = true;
   public rowData: any[] = [];
   public columnDefs = fixedIncomeColumnDefs.map(col => ({
     ...col,
@@ -90,11 +93,29 @@ export class AppComponent implements OnInit {
     this.gridApi = params.api;
     
     // Set initial grouping
-    this.gridApi.setRowGroupColumns([ 'issuerName','issuerSector','issuerType']);
+    this.gridApi.setRowGroupColumns(['issuerName','issuerSector','issuerType']);
     
-    console.log('Grid Ready: ', {
+    // Configure enhanced navigation
+    const navigationConfig: EnhancedNavigationConfig = {
+      enabledKeys: [
+        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 
+        'Tab', 'Home', 'End', 'PageUp', 'PageDown'
+      ],
+      eventsPerSecond: 10, // Higher rate for smoother navigation
+      initialDelay: 250,   // Slightly faster initial delay
+      rapidInterval: 40,   // Faster repeat interval
+      accelerationRate: 0.92, // Faster acceleration
+      minInterval: 8,      // Minimum interval for very fast navigation
+      targetElement: document.body // Listen on document body for global navigation
+    };
+    
+    // Enhance the grid with advanced keyboard navigation
+    this.navigationCleanup = GridWrapper.enhanceGridNavigation(this.gridApi, navigationConfig);
+    
+    console.log('Grid Ready with Enhanced Navigation: ', {
       totalRows: this.rowData.length,
-      totalColumns: this.columnDefs.length
+      totalColumns: this.columnDefs.length,
+      navigationEnabled: true
     });
   }
 
@@ -280,6 +301,50 @@ export class AppComponent implements OnInit {
     } else {
       console.log('No saved grid state found');
       alert('No saved grid state found');
+    }
+  }
+
+  toggleEnhancedNavigation(): void {
+    if (this.enhancedNavigationEnabled) {
+      // Disable enhanced navigation
+      if (this.navigationCleanup) {
+        this.navigationCleanup();
+        this.navigationCleanup = undefined;
+      }
+      this.enhancedNavigationEnabled = false;
+      console.log('Enhanced navigation disabled');
+    } else {
+      // Re-enable enhanced navigation
+      if (this.gridApi) {
+        const navigationConfig: EnhancedNavigationConfig = {
+          enabledKeys: [
+            'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 
+            'Tab', 'Home', 'End', 'PageUp', 'PageDown'
+          ],
+          eventsPerSecond: 10,
+          initialDelay: 250,
+          rapidInterval: 40,
+          accelerationRate: 0.92,
+          minInterval: 8,
+          targetElement: document.body
+        };
+        
+        this.navigationCleanup = GridWrapper.enhanceGridNavigation(this.gridApi, navigationConfig);
+        this.enhancedNavigationEnabled = true;
+        console.log('Enhanced navigation enabled');
+      }
+    }
+  }
+
+  isEnhancedNavigationEnabled(): boolean {
+    return this.enhancedNavigationEnabled && !!this.navigationCleanup;
+  }
+
+  ngOnDestroy(): void {
+    // Clean up the enhanced navigation
+    if (this.navigationCleanup) {
+      this.navigationCleanup();
+      console.log('Enhanced navigation cleaned up');
     }
   }
 }

@@ -11,6 +11,13 @@
         <button (click)="checkLocalStorage()" class="btn btn-info">Check Storage</button>
         <button (click)="saveGridState()" class="btn btn-primary">Save State</button>
         <button (click)="loadGridState()" class="btn btn-secondary">Load State</button>
+        <button 
+          (click)="toggleEnhancedNavigation()" 
+          [class]="'btn ' + (enhancedNavigationEnabled ? 'btn-success' : 'btn-outline-secondary')"
+          title="Toggle Enhanced Keyboard Navigation"
+        >
+          {{ enhancedNavigationEnabled ? '⌨️ Nav ON' : '⌨️ Nav OFF' }}
+        </button>
         <label class="toggle-label">
           <input 
             type="checkbox" 
