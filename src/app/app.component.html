@@ -6,15 +6,21 @@
       <span>ag-Grid v32 with Angular 16</span>
     </div>
     <div class="header-right">
-      <label class="toggle-label">
-        <input 
-          type="checkbox" 
-          [checked]="showAggregationPanel"
-          (change)="toggleAggregationPanel()"
-          class="toggle-checkbox"
-        />
-        <span>Show Aggregations</span>
-      </label>
+      <div class="header-controls">
+        <button (click)="testButtonClick()" class="btn btn-warning">Test Click</button>
+        <button (click)="checkLocalStorage()" class="btn btn-info">Check Storage</button>
+        <button (click)="saveGridState()" class="btn btn-primary">Save State</button>
+        <button (click)="loadGridState()" class="btn btn-secondary">Load State</button>
+        <label class="toggle-label">
+          <input 
+            type="checkbox" 
+            [checked]="showAggregationPanel"
+            (change)="toggleAggregationPanel()"
+            class="toggle-checkbox"
+          />
+          <span>Show Aggregations</span>
+        </label>
+      </div>
     </div>
   </header>
 
@@ -32,6 +38,10 @@
       (gridReady)="onGridReady($event)"
     >
     </ag-grid-angular>
+    <div class="grid-controls">
+      <button (click)="saveGridState()" class="btn btn-primary">Save Grid State</button>
+      <button (click)="loadGridState()" class="btn btn-secondary">Load Grid State</button>
+    </div>
   </main>
 
   <!-- Fixed Footer -->
