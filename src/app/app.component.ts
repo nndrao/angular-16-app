@@ -132,6 +132,7 @@ export class AppComponent implements OnInit {
     enableRangeSelection: true,
     suppressRowClickSelection: true,
     rowGroupPanelShow: 'always',
+    groupDisplayType: 'groupRows',
     statusBar: {
       statusPanels: [
         { statusPanel: 'agTotalRowCountComponent', align: 'left' },
@@ -728,11 +729,12 @@ export class AppComponent implements OnInit {
     });
   }
 
-  // Add missing method
   toggleAggregationPanel(): void {
     this.showAggregationPanel = !this.showAggregationPanel;
     if (this.gridApi) {
-      this.gridApi.setGroupDisplayType(this.showAggregationPanel ? 'groupRows' : 'custom');
+      const displayType = this.showAggregationPanel ? 'groupRows' : 'group';
+      this.gridApi.setGridOption('groupDisplayType', displayType as any);
+      this.gridApi.refreshCells();
     }
   }
 }
