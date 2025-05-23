@@ -20,9 +20,9 @@
     "@angular/router": "^16.0.0",
     "@faker-js/faker": "^9.8.0",
     "ag-charts-types": "^11.3.0",
-    "ag-grid-angular": "32.0.0",
-    "ag-grid-community": "32.0.0",
-    "ag-grid-enterprise": "32.0.0",
+    "ag-grid-angular": "32.2.0",
+    "ag-grid-community": "32.2.0",
+    "ag-grid-enterprise": "32.2.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.13.0"
